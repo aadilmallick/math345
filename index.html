@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="./">
+    <title>Math345 — Interactive SIR Model</title>
+    <style>
+        body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin:0; padding:0; background:#f3f4f6; color:#111827 }
+        .container { max-width:960px; margin:32px auto; padding:20px }
+        header { display:flex; align-items:center; justify-content:space-between; gap:16px }
+        nav a { margin-left:12px; color:#2563eb; text-decoration:none; font-weight:600 }
+        .card { background:white; padding:18px; border-radius:12px; box-shadow:0 6px 18px rgba(15,23,42,0.06) }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1 style="margin:0; font-size:1.3rem">Math345 — Demo Pages</h1>
+                <p style="margin:4px 0 0; color:#6b7280">Small static site for course demos.</p>
+            </div>
+            <nav>
+                <a href="index.html">Home</a>
+                <a href="sir-charts.html">Interactive SIR Chart</a>
+            </nav>
+        </header>
+
+        <main style="margin-top:20px">
+            <div class="card">
+                <h2 style="margin-top:0">Welcome</h2>
+                <p>This repository contains a simple static visualization of an SIR epidemic model. Click <a href="sir-charts.html">Interactive SIR Chart</a> to open the visualization.</p>
+
+                <section style="margin-top:16px; font-size:0.95rem; color:#374151">
+                    <h3 style="margin:0 0 8px 0">Notes for GitHub Pages</h3>
+                    <ul style="margin:0 0 0 18px">
+                        <li>Pages are static — keep links relative (already done).</li>
+                        <li>Enable GitHub Pages in your repository settings and serve from the <code>main</code> branch (root) or a <code>gh-pages</code> branch.</li>
+                        <li>After enabling, your site will be available at <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/</code>. The interactive chart will be at <code>/sir-charts.html</code>.</li>
+                    </ul>
+                </section>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

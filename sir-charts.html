@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive SIR Model Visualization</title>
+    <!-- 1. Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    
+    <!-- 3. Custom Styles and Font -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-blue-700">Interactive SIR Model Visualization</h1>
+            <p class="text-lg text-gray-600 mt-2">See how an epidemic spreads based on your parameters.</p>
+        </header>
+
+        <!-- Main Content (Controls + Chart) -->
+        <div class="flex flex-col md:flex-row bg-white rounded-xl shadow-2xl overflow-hidden">
+
+            <!-- == CONTROLS PANEL (Left) == -->
+            <div class="w-full md:w-1/3 p-6 border-b md:border-b-0 md:border-r border-gray-200">
+                <h2 class="text-2xl font-bold mb-6 text-gray-700 border-b pb-2">Set Parameters</h2>
+                
+                <div class="space-y-6">
+                    <!-- Total Population -->
+                    <div>
+                        <label for="totalPopulation" class="block text-sm font-medium text-gray-700">Total Population ($N$)</label>
+                        <input type="range" id="totalPopulation" min="1000" max="1000000" value="100000" step="1000" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="totalPopulationValue" class="text-sm text-blue-600 font-medium">100,000</span>
+                    </div>
+
+                    <!-- Initial Infected -->
+                    <div>
+                        <label for="initialInfected" class="block text-sm font-medium text-gray-700">Initial Infected ($I_0$)</label>
+                        <input type="range" id="initialInfected" min="1" max="100" value="10" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="initialInfectedValue" class="text-sm text-blue-600 font-medium">10</span>
+                    </div>
+
+                    <!-- Infectious Period -->
+                    <div>
+                        <label for="infectiousPeriod" class="block text-sm font-medium text-gray-700">Infectious Period (days)</label>
+                        <input type="range" id="infectiousPeriod" min="1" max="30" value="10" step="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="infectiousPeriodValue" class="text-sm text-blue-600 font-medium">10 days</span>
+                    </div>
+                    
+                    <!-- R0 (Basic Reproduction Number) -->
+                    <div>
+                        <label for="r0" class="block text-sm font-medium text-gray-700">Basic Reproduction Number ($R_0$)</label>
+                        <input type="range" id="r0" min="0.1" max="5.0" value="2.5" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="r0Value" class="text-sm text-blue-600 font-medium">2.5</span>
+                    </div>
+
+                    <!-- Simulation Time -->
+                    <div>
+                        <label for="maxTime" class="block text-sm font-medium text-gray-700">Simulation Duration (days)</label>
+                        <input type="range" id="maxTime" min="50" max="500" value="200" step="10" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="maxTimeValue" class="text-sm text-blue-600 font-medium">200 days</span>
+                    </div>
+                </div>
+
+                <!-- Run Button -->
+                <button id="runButton" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300 mt-8 text-lg">
+                    Run Simulation
+                </button>
+
+                <!-- Parameter Display -->
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg border">
+                    <h3 class="font-semibold text-gray-700">Calculated Rates:</h3>
+                    <div class="text-sm text-gray-600 mt-2">
+                        <p>Recovery Rate ($\gamma$): <span id="gammaDisplay" class="font-medium text-gray-900">...</span></p>
+                        <p>Transmission Rate ($\beta$): <span id="betaDisplay" class="font-medium text-gray-900">...</span></p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- == VISUALIZATION PANEL (Right) == -->
+            <div class="w-full md:w-2/3 p-6">
+                <h2 class="text-2xl font-bold mb-4 text-gray-700">Epidemic Curves</h2>
+                <!-- Chart.js canvas -->
+                <div class="relative h-96 md:h-[500px]">
+                    <canvas id="sirChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Explanation Section -->
+        <div class="mt-8 p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-gray-700 mb-3">About This Model</h2>
+            <p class="text-gray-600">This visualization runs a classic SIR (Susceptible, Infectious, Recovered) model. The population is divided into three groups:</p>
+            <ul class="list-disc list-inside mt-2 space-y-1">
+                <li><strong class="text-blue-600">Susceptible (S):</strong> People who are not yet infected but can be.</li>
+                <li><strong class="text-red-600">Infectious (I):</strong> People who are currently infected and can spread the disease.</li>
+                <li><strong class="text-green-600">Recovered (R):</strong> People who have recovered and are now immune (or have been removed).</li>
+            </ul>
+            <p class="text-gray-600 mt-3">The model is calculated using Euler's method to solve the three underlying differential equations. $R_0 = \beta / \gamma$, where $\gamma$ is the recovery rate (1 / infectious period) and $\beta$ is the transmission rate.</p>
+        </div>
+
+    </div>
+
+    <!-- == JAVASCRIPT LOGIC == -->
+    <script>
+        // Get all control elements
+        const popInput = document.getElementById('totalPopulation');
+        const popValue = document.getElementById('totalPopulationValue');
+        const infectedInput = document.getElementById('initialInfected');
+        const infectedValue = document.getElementById('initialInfectedValue');
+        const periodInput = document.getElementById('infectiousPeriod');
+        const periodValue = document.getElementById('infectiousPeriodValue');
+        const r0Input = document.getElementById('r0');
+        const r0Value = document.getElementById('r0Value');
+        const timeInput = document.getElementById('maxTime');
+        const timeValue = document.getElementById('maxTimeValue');
+        
+        const runButton = document.getElementById('runButton');
+        const gammaDisplay = document.getElementById('gammaDisplay');
+        const betaDisplay = document.getElementById('betaDisplay');
+
+        const chartCanvas = document.getElementById('sirChart');
+        let sirChart; // This will hold the Chart.js instance
+
+        // === 1. Event Listeners for Sliders ===
+        
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-US').format(num);
+        }
+
+        popInput.oninput = () => {
+            popValue.textContent = formatNumber(popInput.value);
+        };
+        infectedInput.oninput = () => {
+            infectedValue.textContent = formatNumber(infectedInput.value);
+        };
+        periodInput.oninput = () => {
+            periodValue.textContent = `${periodInput.value} days`;
+            updateCalculatedRates();
+        };
+        r0Input.oninput = () => {
+            r0Value.textContent = r0Input.value;
+            updateCalculatedRates();
+        };
+        timeInput.oninput = () => {
+            timeValue.textContent = `${timeInput.value} days`;
+        };
+        runButton.onclick = runSimulation;
+
+        function updateCalculatedRates() {
+            const R0 = parseFloat(r0Input.value);
+            const infectiousPeriod = parseFloat(periodInput.value);
+            
+            const gamma = 1 / infectiousPeriod;
+            const beta = R0 * gamma;
+
+            gammaDisplay.textContent = gamma.toFixed(4);
+            betaDisplay.textContent = beta.toFixed(4);
+
+            // Dynamically color the R0 value
+            if (R0 > 1) {
+                r0Value.className = "text-sm text-red-600 font-medium";
+            } else {
+                r0Value.className = "text-sm text-green-600 font-medium";
+            }
+        }
+
+        // === 2. The SIR Model Solver ===
+        function runSimulation() {
+            // --- Get initial parameters from controls ---
+            const N = parseInt(popInput.value, 10);
+            const I0 = parseInt(infectedInput.value, 10);
+            const S0 = N - I0;
+            const R0_val = parseFloat(r0Input.value);
+            const infectiousPeriod = parseFloat(periodInput.value);
+            const maxTime = parseInt(timeInput.value, 10);
+
+            // --- Calculate model rates ---
+            const gamma = 1 / infectiousPeriod; // Recovery rate
+            const beta = R0_val * gamma;      // Transmission rate
+            
+            // --- Setup simulation variables ---
+            let S = S0;
+            let I = I0;
+            let R = 0;
+            const dt = 0.1; // Time step (in days). Smaller is more accurate.
+            let t = 0;
+
+            // --- Setup data arrays for the chart ---
+            const timeLabels = [0];
+            const sData = [S0];
+            const iData = [I0];
+            const rData = [0];
+
+            // --- Run the Euler's method numerical solver ---
+            while (t < maxTime && I > 0.1) {
+                // Calculate the derivatives
+                const dS_dt = -(beta * S * I) / N;
+                const dI_dt = (beta * S * I) / N - (gamma * I);
+                const dR_dt = gamma * I;
+
+                // Calculate new values for S, I, R
+                // Add a check to prevent values from going below zero
+                S = Math.max(0, S + dS_dt * dt);
+                I = Math.max(0, I + dI_dt * dt);
+                R = Math.max(0, R + dR_dt * dt);
+                
+                t += dt;
+
+                // Add data for the chart (we can round to integers for people)
+                timeLabels.push(t.toFixed(1));
+                sData.push(Math.round(S));
+                iData.push(Math.round(I));
+                rData.push(Math.round(R));
+            }
+
+            // --- 3. Render the Chart ---
+            renderChart(timeLabels, sData, iData, rData, N);
+        }
+
+        // === 3. The Chart Rendering Function ===
+        function renderChart(labels, sData, iData, rData, population) {
+            const ctx = chartCanvas.getContext('2d');
+
+            // Destroy the old chart if it exists (for re-runs)
+            if (sirChart) {
+                sirChart.destroy();
+            }
+
+            sirChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Susceptible (S)',
+                            data: sData,
+                            borderColor: 'rgb(59, 130, 246)', // blue-500
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: false,
+                            borderWidth: 2,
+                            pointRadius: 0,
+                        },
+                        {
+                            label: 'Infectious (I)',
+                            data: iData,
+                            borderColor: 'rgb(239, 68, 68)', // red-500
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            fill: false,
+                            borderWidth: 3, // Make infectious curve thicker
+                            pointRadius: 0,
+                        },
+                        {
+                            label: 'Recovered (R)',
+                            data: rData,
+                            borderColor: 'rgb(22, 163, 74)', // green-600
+                            backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                            fill: false,
+                            borderWidth: 2,
+                            pointRadius: 0,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 500 // 0.5s animation on new run
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time (days)',
+                                font: {
+                                    size: 14
+                                }
+                            },
+                            ticks: {
+                                maxTicksLimit: 10
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Number of People',
+                                font: {
+                                    size: 14
+                                }
+                            },
+                            min: 0,
+                            max: population // Set max y-axis to total population
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += formatNumber(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    }
+                }
+            });
+        }
+
+        // === 4. Initial Setup on Page Load ===
+        window.onload = () => {
+            // Trigger sliders to set initial text
+            popInput.oninput();
+            infectedInput.oninput();
+            periodInput.oninput();
+            r0Input.oninput();
+            timeInput.oninput();
+            
+            // Run and render the simulation with default values
+            runSimulation();
+        };
+
+    </script>
+
+</body>
+</html>
