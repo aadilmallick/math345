@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive SIR Model with Vaccinations Visualization (Canvas Grid)</title>
+    <!-- 1. Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Custom Styles and Font -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        
+        /* Ensure canvas is sharp on high-DPI screens */
+        canvas {
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-blue-700">SIR Model with Vaccinations Canvas Visualization</h1>
+            <p class="text-lg text-gray-600 mt-2">Watch the epidemic spread through a population grid with vaccinations.</p>
+        </header>
+
+        <!-- Main Content (Controls + Canvas) -->
+        <div class="flex flex-col md:flex-row bg-white rounded-xl shadow-2xl overflow-hidden">
+
+            <!-- == CONTROLS PANEL (Left) == -->
+            <div class="w-full md:w-1/3 p-6 border-b md:border-b-0 md:border-r border-gray-200">
+                <h2 class="text-2xl font-bold mb-6 text-gray-700 border-b pb-2">Set Parameters</h2>
+                
+                <div class="space-y-6">
+                    <!-- Total Population -->
+                    <div>
+                        <label for="totalPopulation" class="block text-sm font-medium text-gray-700">Total Population ($N$)</label>
+                        <input type="range" id="totalPopulation" min="1000" max="1000000" value="100000" step="1000" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="totalPopulationValue" class="text-sm text-blue-600 font-medium">100,000</span>
+                    </div>
+
+                    <!-- Initial Infected -->
+                    <div>
+                        <label for="initialInfected" class="block text-sm font-medium text-gray-700">Initial Infected ($I_0$)</label>
+                        <input type="range" id="initialInfected" min="1" max="100" value="10" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="initialInfectedValue" class="text-sm text-blue-600 font-medium">10</span>
+                    </div>
+
+                    <!-- Infectious Period -->
+                    <div>
+                        <label for="infectiousPeriod" class="block text-sm font-medium text-gray-700">Infectious Period (days)</label>
+                        <input type="range" id="infectiousPeriod" min="1" max="30" value="10" step="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="infectiousPeriodValue" class="text-sm text-blue-600 font-medium">10 days</span>
+                    </div>
+                    
+                    <!-- R0 (Basic Reproduction Number) -->
+                    <div>
+                        <label for="r0" class="block text-sm font-medium text-gray-700">Basic Reproduction Number ($R_0$)</label>
+                        <input type="range" id="r0" min="0.1" max="5.0" value="2.5" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="r0Value" class="text-sm text-blue-600 font-medium">2.5</span>
+                    </div>
+
+                    <!-- Vaccination Rate -->
+                    <div>
+                        <label for="vaccinationRate" class="block text-sm font-medium text-gray-700">Vaccination Rate (per day)</label>
+                        <input type="range" id="vaccinationRate" min="0" max="0.1" value="0.01" step="0.001" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="vaccinationRateValue" class="text-sm text-blue-600 font-medium">0.01</span>
+                    </div>
+
+                    <!-- Simulation Time -->
+                    <div>
+                        <label for="maxTime" class="block text-sm font-medium text-gray-700">Simulation Duration (days)</label>
+                        <input type="range" id="maxTime" min="50" max="500" value="200" step="10" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        <span id="maxTimeValue" class="text-sm text-blue-600 font-medium">200 days</span>
+                    </div>
+                </div>
+
+                <!-- Run Button -->
+                <button id="runButton" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300 mt-8 text-lg">
+                    Run Simulation
+                </button>
+
+                <!-- Parameter Display -->
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg border">
+                    <h3 class="font-semibold text-gray-700">Calculated Rates:</h3>
+                    <div class="text-sm text-gray-600 mt-2">
+                        <p>Recovery Rate ($\gamma$): <span id="gammaDisplay" class="font-medium text-gray-900">...</span></p>
+                        <p>Transmission Rate ($\beta$): <span id="betaDisplay" class="font-medium text-gray-900">...</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- == VISUALIZATION PANEL (Right) == -->
+            <div class="w-full md:w-2/3 p-6 flex flex-col items-center">
+                <!-- Day Counter -->
+                <h2 class="text-2xl font-bold mb-4 text-gray-700">Day: <span id="dayCounter" class="text-blue-600">0</span></h2>
+                
+                <!-- Canvas -->
+                <div class="w-full max-w-lg aspect-square bg-gray-200 rounded-lg overflow-hidden">
+                    <canvas id="sirCanvas"></canvas>
+                </div>
+
+                <!-- Live Data Readouts -->
+                <div class="w-full max-w-lg grid grid-cols-2 gap-4 mt-4 text-center">
+                    <div class="p-4 bg-blue-100 text-blue-800 rounded-lg shadow">
+                        <span class="text-xs font-semibold uppercase">Susceptible</span>
+                        <p id="sCount" class="text-2xl font-bold">0</p>
+                        <p id="sPercent" class="text-sm font-medium">0%</p>
+                    </div>
+                    <div class="p-4 bg-red-100 text-red-800 rounded-lg shadow">
+                        <span class="text-xs font-semibold uppercase">Infectious</span>
+                        <p id="iCount" class="text-2xl font-bold">0</p>
+                        <p id="iPercent" class="text-sm font-medium">0%</p>
+                    </div>
+                    <div class="p-4 bg-green-100 text-green-800 rounded-lg shadow">
+                        <span class="text-xs font-semibold uppercase">Recovered</span>
+                        <p id="rCount" class="text-2xl font-bold">0</p>
+                        <p id="rPercent" class="text-sm font-medium">0%</p>
+                    </div>
+                    <div class="p-4 bg-purple-100 text-purple-800 rounded-lg shadow">
+                        <span class="text-xs font-semibold uppercase">Vaccinated</span>
+                        <p id="vCount" class="text-2xl font-bold">0</p>
+                        <p id="vPercent" class="text-sm font-medium">0%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- == JAVASCRIPT LOGIC == -->
+    <script>
+        // === 0. Setup and Config ===
+        
+        // --- Get all control elements ---
+        const popInput = document.getElementById('totalPopulation');
+        const popValue = document.getElementById('totalPopulationValue');
+        const infectedInput = document.getElementById('initialInfected');
+        const infectedValue = document.getElementById('initialInfectedValue');
+        const periodInput = document.getElementById('infectiousPeriod');
+        const periodValue = document.getElementById('infectiousPeriodValue');
+        const r0Input = document.getElementById('r0');
+        const r0Value = document.getElementById('r0Value');
+        const vaccinationRateInput = document.getElementById('vaccinationRate');
+        const vaccinationRateValue = document.getElementById('vaccinationRateValue');
+        const timeInput = document.getElementById('maxTime');
+        const timeValue = document.getElementById('maxTimeValue');
+        
+        const runButton = document.getElementById('runButton');
+        const gammaDisplay = document.getElementById('gammaDisplay');
+        const betaDisplay = document.getElementById('betaDisplay');
+        
+        // --- Get canvas and readout elements ---
+        const canvas = document.getElementById('sirCanvas');
+        const ctx = canvas.getContext('2d');
+        const dayCounter = document.getElementById('dayCounter');
+        
+        const sCount = document.getElementById('sCount');
+        const sPercent = document.getElementById('sPercent');
+        const iCount = document.getElementById('iCount');
+        const iPercent = document.getElementById('iPercent');
+        const rCount = document.getElementById('rCount');
+        const rPercent = document.getElementById('rPercent');
+        const vCount = document.getElementById('vCount');
+        const vPercent = document.getElementById('vPercent');
+
+        // --- Global simulation state variables ---
+        // Renamed S, I, R, V to avoid conflicts
+        let totalPop, susceptibleCount, infectiousCount, recoveredCount, vaccinatedCount, beta, gamma, nu, t, maxTime;
+        let animationFrameId = null; // To control the animation loop
+        const dt = 0.1; // Simulation precision (0.1 days)
+        const daysPerFrame = 1; // How many simulation days to run per animation frame
+
+        // --- Grid settings ---
+        const GRID_SIZE = 10;
+        const TOTAL_DOTS = GRID_SIZE * GRID_SIZE;
+        const DOT_COLORS = {
+            S: 'rgb(59, 130, 246)',  // blue-500
+            I: 'rgb(239, 68, 68)',   // red-500
+            R: 'rgb(22, 163, 74)',   // green-600
+            V: 'rgb(147, 51, 234)'   // purple-600
+        };
+
+        // === 1. Control Sliders Logic ===
+        
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-US').format(Math.round(num));
+        }
+
+        popInput.oninput = () => {
+            popValue.textContent = formatNumber(popInput.value);
+        };
+        infectedInput.oninput = () => {
+            infectedValue.textContent = formatNumber(infectedInput.value);
+        };
+        periodInput.oninput = () => {
+            periodValue.textContent = `${periodInput.value} days`;
+            updateCalculatedRates();
+        };
+        r0Input.oninput = () => {
+            r0Value.textContent = r0Input.value;
+            updateCalculatedRates();
+        };
+        vaccinationRateInput.oninput = () => {
+            vaccinationRateValue.textContent = parseFloat(vaccinationRateInput.value).toFixed(3);
+        };
+        timeInput.oninput = () => {
+            timeValue.textContent = `${timeInput.value} days`;
+        };
+        runButton.onclick = resetAndStartSimulation;
+
+        function updateCalculatedRates() {
+            const R0 = parseFloat(r0Input.value);
+            const infectiousPeriod = parseFloat(periodInput.value);
+            
+            gamma = 1 / infectiousPeriod;
+            beta = R0 * gamma;
+
+            gammaDisplay.textContent = gamma.toFixed(4);
+            betaDisplay.textContent = beta.toFixed(4);
+
+            if (R0 > 1) {
+                r0Value.className = "text-sm text-red-600 font-medium";
+            } else {
+                r0Value.className = "text-sm text-green-600 font-medium";
+            }
+        }
+
+        // === 2. Canvas Drawing Logic ===
+
+        function resizeCanvas() {
+            const parent = canvas.parentElement;
+            const size = parent.clientWidth;
+            canvas.width = size * window.devicePixelRatio;
+            canvas.height = size * window.devicePixelRatio;
+            canvas.style.width = `${size}px`;
+            canvas.style.height = `${size}px`;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        function drawGrid() {
+            const parentWidth = canvas.parentElement.clientWidth;
+            const dotSize = Math.floor(parentWidth / GRID_SIZE);
+            const margin = (parentWidth - (dotSize * GRID_SIZE)) / 2;
+            const dotRadius = dotSize * 0.4; // 40% of the cell size
+
+            ctx.clearRect(0, 0, parentWidth, parentWidth);
+
+            // Calculate dot counts based on current S, I, R, V
+            const i_dots = Math.round((infectiousCount / totalPop) * TOTAL_DOTS); // Use renamed var
+            const r_dots = Math.round((recoveredCount / totalPop) * TOTAL_DOTS); // Use renamed var
+            const v_dots = Math.round((vaccinatedCount / totalPop) * TOTAL_DOTS); // Use renamed var
+            let s_dots = TOTAL_DOTS - i_dots - r_dots - v_dots;
+            
+            // Fix potential rounding errors
+            if (s_dots < 0) s_dots = 0;
+
+            let dot_index = 0;
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const x = margin + c * dotSize + dotSize / 2;
+                    const y = margin + r * dotSize + dotSize / 2;
+
+                    let state;
+                    if (dot_index < s_dots) {
+                        state = 'S';
+                    } else if (dot_index < s_dots + i_dots) {
+                        state = 'I';
+                    } else if (dot_index < s_dots + i_dots + r_dots) {
+                        state = 'R';
+                    } else {
+                        state = 'V';
+                    }
+                    dot_index++;
+
+                    ctx.beginPath();
+                    ctx.arc(x, y, dotRadius, 0, 2 * Math.PI);
+                    ctx.fillStyle = DOT_COLORS[state];
+                    ctx.fill();
+                }
+            }
+        }
+
+        // === 3. Simulation Logic ===
+
+        function resetAndStartSimulation() {
+            // Stop any existing animation
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
+            // (Re)calculate parameters from sliders
+            updateCalculatedRates(); // This sets global beta and gamma
+            
+            // Get vaccination rate
+            nu = parseFloat(vaccinationRateInput.value);
+            
+            // (Re)set initial conditions
+            totalPop = parseInt(popInput.value, 10);
+            infectiousCount = parseInt(infectedInput.value, 10);
+            susceptibleCount = totalPop - infectiousCount;
+            recoveredCount = 0;
+            vaccinatedCount = 0;
+            t = 0;
+            maxTime = parseInt(timeInput.value, 10);
+            
+            // Start the animation loop
+            animate();
+        }
+
+        function animate() {
+            // Stop condition
+            if (infectiousCount < 0.1 || t > maxTime) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+                // Final draw and update
+                updateReadouts();
+                drawGrid();
+                return;
+            }
+
+            // --- Run simulation steps for `daysPerFrame` ---
+            // This loop ensures the math is smoother than the animation
+            const stepsPerFrame = Math.round(daysPerFrame / dt);
+            for (let i = 0; i < stepsPerFrame; i++) {
+                if (infectiousCount > 0 || susceptibleCount > 0) {
+                    const newInfections = (beta * susceptibleCount * infectiousCount / totalPop) * dt;
+                    const newRecoveries = gamma * infectiousCount * dt;
+                    const newVaccinations = nu * susceptibleCount * dt;
+                    
+                    susceptibleCount = Math.max(0, susceptibleCount - newInfections - newVaccinations);
+                    infectiousCount = Math.max(0, infectiousCount + newInfections - newRecoveries);
+                    recoveredCount = Math.max(0, recoveredCount + newRecoveries);
+                    vaccinatedCount = Math.max(0, vaccinatedCount + newVaccinations);
+                }
+            }
+            t += daysPerFrame;
+            
+            // --- Update UI ---
+            updateReadouts();
+            drawGrid();
+            
+            // --- Request next frame ---
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        function updateReadouts() {
+            dayCounter.textContent = Math.round(t);
+            
+            sCount.textContent = formatNumber(susceptibleCount);
+            iCount.textContent = formatNumber(infectiousCount);
+            rCount.textContent = formatNumber(recoveredCount);
+            vCount.textContent = formatNumber(vaccinatedCount);
+
+            sPercent.textContent = `${((susceptibleCount / totalPop) * 100).toFixed(1)}%`;
+            iPercent.textContent = `${((infectiousCount / totalPop) * 100).toFixed(1)}%`;
+            rPercent.textContent = `${((recoveredCount / totalPop) * 100).toFixed(1)}%`;
+            vPercent.textContent = `${((vaccinatedCount / totalPop) * 100).toFixed(1)}%`;
+        }
+ 
+        // === 4. Initial Setup on Page Load ===
+        window.onload = () => {
+            // Handle canvas resizing
+            resizeCanvas();
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                drawGrid(); // Redraw grid on resize
+            });
+
+            // Trigger sliders to set initial text
+            popInput.oninput();
+            infectedInput.oninput();
+            periodInput.oninput();
+            r0Input.oninput();
+            vaccinationRateInput.oninput();
+            timeInput.oninput();
+            
+            // Run and render the simulation with default values
+            resetAndStartSimulation();
+        };
+
+    </script>
+
+</body>
+</html>
