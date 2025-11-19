@@ -1,5 +1,7 @@
 # Math345 — Static Demo Site
 
+Dear professor Mainak,
+
 This small repository contains demo pages for a course assignment, including an interactive SIR model visualization.
 
 Files of interest:
